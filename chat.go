@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
@@ -90,11 +91,25 @@ func (cs *chatServer) createRoom(roomId string, name string) {
 	}
 	cs.rooms[roomId] = room
 
+	go func() {
+		for {
+			time.Sleep(30 * time.Second)
+			cs.roomMutex.Lock()
+			if room, ok := cs.rooms[roomId]; ok && len(room.subscribers) == 0 {
+				cs.roomMutex.Unlock()
+				cs.deleteRoom(roomId)
+				return
+			}
+			cs.roomMutex.Unlock()
+		}
+	}()
+
 	cs.roomMutex.Unlock()
 }
 
 func (cs *chatServer) deleteRoom(roomId string) {
 	cs.roomMutex.Lock()
+	cs.infoLog.Printf("Deleting room: %v",roomId)
 	delete(cs.rooms, roomId)
 	cs.roomMutex.Unlock()
 }
